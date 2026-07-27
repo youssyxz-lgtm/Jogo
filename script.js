@@ -1,4 +1,3 @@
-
 /* =========================================================================
    ZONA DE COMBATE — mini FPS em JavaScript puro
    Motor: raycasting 2.5D (estilo Wolfenstein), sem bibliotecas externas.
@@ -92,7 +91,7 @@ const SFX = {
     }
     if (this.ctx.state === 'suspended') this.ctx.resume();
   },
-  shot(freq, dur){
+  shot(freq, dur, pan){
     if (!this.ctx) return;
     const t0 = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
@@ -102,7 +101,15 @@ const SFX = {
     osc.frequency.exponentialRampToValueAtTime(Math.max(20,freq * 0.6), t0 + dur);
     gain.gain.setValueAtTime(0.28, t0);
     gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-    osc.connect(gain).connect(this.ctx.destination);
+    osc.connect(gain);
+    // som espacial: ajuda a perceber de que lado um inimigo está atirando
+    if (pan !== undefined && this.ctx.createStereoPanner) {
+      const panner = this.ctx.createStereoPanner();
+      panner.pan.value = Math.max(-1, Math.min(1, pan));
+      gain.connect(panner).connect(this.ctx.destination);
+    } else {
+      gain.connect(this.ctx.destination);
+    }
     osc.start(t0); osc.stop(t0 + dur + 0.02);
   },
   click(freq){
@@ -530,18 +537,28 @@ function updateEnemies(dt, now){
 
 function enemyShoot(en, dist){
   if (!hasLineOfSight(en.x, en.y, player.x, player.y)) return;
-  SFX.init(); SFX.shot(70, 0.08);
+  // ângulo do inimigo em relação para onde o jogador está olhando (-PI..PI)
+  const relAngle = normalizeAngle(Math.atan2(en.y - player.y, en.x - player.x) - player.dir);
+  const pan = clamp(relAngle / (Math.PI / 2), -1, 1);
+  SFX.init(); SFX.shot(70, 0.08, pan);
   const hitChance = clamp(1 - dist / (ENEMY_SIGHT_RANGE + 2), 0.15, 0.82);
   if (Math.random() < hitChance) {
     const dmg = 6 + Math.floor(Math.random() * 10);
-    damagePlayer(dmg);
+    damagePlayer(dmg, relAngle);
   }
 }
 
-function damagePlayer(dmg){
+let hitIndicatorUntil = 0, hitIndicatorAngle = 0;
+function showHitIndicator(relAngle){
+  hitIndicatorAngle = relAngle;
+  hitIndicatorUntil = performance.now() + 1400;
+}
+
+function damagePlayer(dmg, relAngle){
   if (!player.alive) return;
   player.health = Math.max(0, player.health - dmg);
   player.shakeTime = performance.now() + 200;
+  if (relAngle !== undefined) showHitIndicator(relAngle);
   const flash = document.getElementById('damage-flash');
   flash.classList.add('active');
   setTimeout(() => flash.classList.remove('active'), 220);
@@ -699,7 +716,9 @@ function drawEnemySprite(en, sp, now){
   if (zbuffer[colIndex] !== undefined && sp.depth > zbuffer[colIndex]) return; // oculto atrás de parede
 
   const scale = H / sp.depth;
-  const screenX = sp.x, screenY = sp.y;
+  // sp.x/sp.y vêm em espaço "CSS" (para uso em elementos HTML); o canvas
+  // desenha em espaço interno reduzido por RENDER_SCALE, então convertemos aqui.
+  const screenX = sp.x * RENDER_SCALE, screenY = sp.y * RENDER_SCALE;
   const bodyH = scale * 0.011, bodyW = bodyH * 0.42;
 
   ctx.save();
@@ -796,6 +815,16 @@ function updateHUD(now){
 
   const hm = document.getElementById('hitmarker');
   hm.classList.toggle('show', now < hitmarkerUntil);
+
+  // seta que aponta de onde veio o último tiro recebido
+  const hi = document.getElementById('hit-indicator');
+  const arrow = hi.querySelector('.hit-arrow');
+  if (now < hitIndicatorUntil) {
+    hi.style.transform = `rotate(${hitIndicatorAngle * (180 / Math.PI)}deg)`;
+    arrow.classList.add('show');
+  } else {
+    arrow.classList.remove('show');
+  }
 }
 
 function ensureMuzzleFlashEl(){
