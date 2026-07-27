@@ -1,4 +1,4 @@
-/* =========================================================================
+window.onerror = function(msg, url, line){ alert('ERRO: ' + msg + ' (linha ' + line + ')'); };/* =========================================================================
    ZONA DE COMBATE — mini FPS em JavaScript puro
    Motor: raycasting 2.5D (estilo Wolfenstein), sem bibliotecas externas.
    Organizado em seções para facilitar expansão futura.
