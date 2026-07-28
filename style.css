@@ -171,6 +171,51 @@ html,body{
 #crosshair span:nth-child(4){ right:0; top:50%; width:8px; height:2px; transform:translateY(-50%); }
 #crosshair.ads{ transform:translate(-50%,-50%) scale(0.55); }
 #crosshair.shoot span{ background:var(--amber); }
+#crosshair.scoped{ opacity:0; } /* escondida quando a luneta telescópica está ativa */
+
+/* red dot (mira reflex — AK-47, Uzi, P90 ao mirar) */
+#crosshair.reddot span{ display:none; }
+#crosshair.reddot::before{
+  content:'';
+  position:absolute; top:50%; left:50%;
+  width:9px; height:9px; border-radius:50%;
+  background:var(--danger);
+  transform:translate(-50%,-50%);
+  box-shadow:0 0 8px rgba(255,59,48,0.9), 0 0 2px #fff;
+}
+
+/* luneta telescópica (Kar98k ao mirar) */
+#scope-overlay{
+  position:absolute; inset:0;
+  pointer-events:none;
+  z-index:21;
+  display:none;
+}
+#scope-overlay.show{ display:block; }
+#scope-overlay::before{
+  content:'';
+  position:absolute; inset:0;
+  background: radial-gradient(circle at 50% 50%, transparent 0 26vh, #000 26.6vh);
+}
+.scope-crosshair-v{
+  position:absolute; top:50%; left:50%;
+  width:2px; height:52vh;
+  background:rgba(5,5,5,0.85);
+  transform:translate(-50%,-50%);
+}
+.scope-crosshair-h{
+  position:absolute; top:50%; left:50%;
+  width:52vh; height:2px;
+  background:rgba(5,5,5,0.85);
+  transform:translate(-50%,-50%);
+}
+.scope-dot{
+  position:absolute; top:50%; left:50%;
+  width:7px; height:7px; border-radius:50%;
+  background:var(--danger);
+  transform:translate(-50%,-50%);
+  box-shadow:0 0 8px rgba(255,59,48,0.9);
+}
 
 #hitmarker{
   position:absolute; top:50%; left:50%;
@@ -334,8 +379,8 @@ html,body{
   position:absolute; top:0; bottom:0;
   z-index:12;
 }
-#joystick-zone{ left:0; width:42%; }
-#look-zone{ right:0; width:58%; }
+#joystick-zone{ left:0; width:38%; }
+#look-zone{ right:0; width:62%; }
 
 #joystick-base{
   position:absolute; left:26px; bottom:26px;
@@ -353,38 +398,52 @@ html,body{
   border:2px solid var(--amber);
 }
 
+/* botões PULAR / AGACHAR — canto superior direito, alcançáveis pelos dedos
+   "de trás" do celular quando se segura com as duas mãos na horizontal */
+#top-buttons{
+  position:absolute; right:16px; top:14px;
+  display:flex; flex-direction:column; gap:10px;
+  z-index:19;
+}
+
+/* botões principais — canto inferior direito, alcançáveis pelo polegar direito */
 #action-buttons{
   position:absolute; right:16px; bottom:20px;
   display:grid;
-  grid-template-columns:64px 64px;
-  grid-template-rows:60px 60px;
-  gap:10px;
+  grid-template-columns:60px 60px;
+  grid-template-rows:56px 56px 90px;
+  gap:9px;
   align-items:end;
+  justify-items:end;
   z-index:19;
 }
+#btn-switch{ grid-column:1; grid-row:1; }
+#btn-reload{ grid-column:2; grid-row:1; }
+#btn-ads{ grid-column:1; grid-row:2; }
+#btn-fire{ grid-column:1 / span 2; grid-row:3; justify-self:center; }
+
 .ctrl-btn{
   font-family:var(--font-ui);
   font-weight:700;
-  font-size:11px;
-  letter-spacing:1px;
+  font-size:10.5px;
+  letter-spacing:0.5px;
   color:var(--ink);
   background:rgba(20,24,16,0.6);
   border:2px solid var(--olive-2);
   display:flex; align-items:center; justify-content:center;
   text-align:center;
+  width:60px; height:56px;
 }
 .ctrl-btn-hex{
   clip-path: polygon(20% 0, 80% 0, 100% 50%, 80% 100%, 20% 100%, 0 50%);
 }
 .ctrl-btn-circle{
   border-radius:50%;
-  width:64px; height:64px;
+  width:60px; height:56px;
 }
 .ctrl-btn-fire{
-  grid-column:1 / span 2;
   border-radius:50%;
   width:86px; height:86px;
-  justify-self:center;
   background:rgba(255,59,48,0.25);
   border-color:var(--danger);
   color:var(--danger);
@@ -393,6 +452,11 @@ html,body{
 .ctrl-btn:active, .ctrl-btn.active{
   filter:brightness(1.5);
   transform:scale(0.94);
+}
+.ctrl-btn.toggled{
+  background:rgba(255,176,32,0.35);
+  border-color:var(--amber);
+  color:var(--amber);
 }
 
 /* partículas de dano/hostis desenhadas no canvas — sem CSS extra necessário */
