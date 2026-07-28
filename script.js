@@ -67,7 +67,7 @@ const WEAPONS = [
     reloadTime: 3200, magSize: 5, reserveMax: 25,
     recoil: 0.09, kick: 22, soundFreq: 55, soundDur: 0.20,
     scope: 'scope', adsZoom: 0.80,
-    vm: { barrelLen: 122, body: '#241d15', stock: '#7a5530', mag: '#241d15' },
+    vm: { barrelLen: 122, body: '#241d15', stock: '#7a5530', mag: '#241d15', scopeTube: true },
   },
   {
     name: 'Uzi', auto: true, damage: 17, headshotMult: 2.0,
@@ -756,7 +756,7 @@ function shadeColor(hex, factor){
 function drawWeaponViewmodel(now){
   const w = WEAPONS[player.weaponIndex];
   const vm = w.vm;
-  const u = Math.min(W, H) / 380; // unidade de escala relativa à resolução da tela
+  const u = Math.min(W, H) / 260; // arma grande, ocupando um bom pedaço da tela
 
   const moving = Math.hypot(joyVec.x, joyVec.y) > 0.15 ||
     keys['KeyW'] || keys['KeyA'] || keys['KeyS'] || keys['KeyD'];
@@ -768,20 +768,25 @@ function drawWeaponViewmodel(now){
   if (player.reloading) {
     const rt = clamp((now - player.reloadStart) / w.reloadTime, 0, 1);
     const dip = rt < 0.5 ? rt / 0.5 : (1 - rt) / 0.5;
-    reloadDrop = dip * 95 * u;
-    reloadTilt = dip * 0.32;
+    reloadDrop = dip * 70 * u;
+    reloadTilt = dip * 0.3;
   }
 
-  const recoilKick = (player.viewKick || 0) * 1.8 * u;
-  const adsSlide = player.adsAmount * 58 * u;
-  const adsRise = player.adsAmount * 34 * u;
+  const recoilKick = (player.viewKick || 0) * 1.6 * u;
+  const adsSlide = player.adsAmount * 100 * u;
+  const adsRise = player.adsAmount * 46 * u;
 
-  const anchorX = W / 2 + 78 * u - adsSlide + bobX;
-  const anchorY = H - 6 * u + bobY + reloadDrop - adsRise - recoilKick;
+  // segurada na diagonal (cano para cima-esquerda), igual ao Blood Strike;
+  // ao mirar, a arma "endireita" pra alinhar a mira com o centro da tela
+  const holdAngle = -0.40 * (1 - player.adsAmount);
+  const angle = holdAngle + reloadTilt - recoilKick * 0.006;
+
+  const anchorX = W / 2 + 132 * u - adsSlide + bobX;
+  const anchorY = H + 34 * u + bobY + reloadDrop - adsRise - recoilKick;
 
   ctx.save();
   ctx.translate(anchorX, anchorY);
-  ctx.rotate(reloadTilt - recoilKick * 0.006);
+  ctx.rotate(angle);
   ctx.scale(u, u);
 
   // manga do braço da frente (sob o cano)
@@ -804,6 +809,16 @@ function drawWeaponViewmodel(now){
   ctx.fillStyle = shadeColor(vm.body, 1.25);
   ctx.fillRect(-42, -18, 84, 5); // reflexo superior sutil
 
+  // luneta telescópica (só no Kar98k)
+  if (vm.scopeTube) {
+    ctx.fillStyle = '#141310';
+    ctx.fillRect(-30, -66, 20, 52);
+    ctx.fillStyle = '#0a0a08';
+    ctx.beginPath(); ctx.arc(-20, -66, 11, 0, Math.PI * 2); ctx.fill(); // lente
+    ctx.fillStyle = 'rgba(140,200,255,0.55)';
+    ctx.beginPath(); ctx.arc(-20, -66, 6, 0, Math.PI * 2); ctx.fill(); // reflexo da lente
+  }
+
   // carregador
   ctx.fillStyle = vm.mag;
   ctx.beginPath();
@@ -823,10 +838,11 @@ function drawWeaponViewmodel(now){
 
   ctx.restore();
 
-  // flash do disparo, na ponta do cano
+  // flash do disparo, na ponta do cano (precisa levar a rotação em conta)
   if (now < muzzleFlashUntil) {
-    const fx = anchorX + Math.sin(reloadTilt) * 0 - 4 * u; // aproximação da ponta do cano
-    const fy = anchorY - vm.barrelLen * u - 4 * u;
+    const localX = -3 * u, localY = (-vm.barrelLen - 6) * u;
+    const fx = anchorX + localX * Math.cos(angle) - localY * Math.sin(angle);
+    const fy = anchorY + localX * Math.sin(angle) + localY * Math.cos(angle);
     const grad = ctx.createRadialGradient(fx, fy, 0, fx, fy, 34 * u);
     grad.addColorStop(0, 'rgba(255,235,170,0.95)');
     grad.addColorStop(0.45, 'rgba(255,176,32,0.55)');
