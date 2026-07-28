@@ -58,24 +58,28 @@ const WEAPONS = [
     fireRate: 105, spread: 0.050, adsSpreadMult: 0.35,
     reloadTime: 2200, magSize: 30, reserveMax: 90,
     recoil: 0.05, kick: 10, soundFreq: 95, soundDur: 0.09,
+    scope: 'reddot', adsZoom: 0.42,
   },
   {
     name: 'Kar98k', auto: false, damage: 96, headshotMult: 1.6,
     fireRate: 1150, spread: 0.008, adsSpreadMult: 0.15,
     reloadTime: 3200, magSize: 5, reserveMax: 25,
     recoil: 0.09, kick: 22, soundFreq: 55, soundDur: 0.20,
+    scope: 'scope', adsZoom: 0.80,
   },
   {
     name: 'Uzi', auto: true, damage: 17, headshotMult: 2.0,
     fireRate: 75, spread: 0.070, adsSpreadMult: 0.40,
     reloadTime: 1700, magSize: 32, reserveMax: 96,
     recoil: 0.032, kick: 7, soundFreq: 150, soundDur: 0.06,
+    scope: 'reddot', adsZoom: 0.30,
   },
   {
     name: 'P90', auto: true, damage: 21, headshotMult: 2.0,
     fireRate: 65, spread: 0.045, adsSpreadMult: 0.30,
     reloadTime: 2000, magSize: 50, reserveMax: 150,
     recoil: 0.026, kick: 6, soundFreq: 170, soundDur: 0.055,
+    scope: 'reddot', adsZoom: 0.36,
   },
 ];
 
@@ -175,6 +179,9 @@ const player = {
   alive: true,
   radius: 0.22,
   speed: 2.6,
+  crouching: false,
+  jumping: false,
+  jumpT: 0, // 0..1 progresso da animação de pulo
 };
 
 class Enemy {
@@ -283,7 +290,7 @@ function hasLineOfSight(x1, y1, x2, y2){
    ========================================================================= */
 const keys = {};
 let mouseLocked = false;
-window.addEventListener('keydown', e => { keys[e.code] = true; if (e.code === 'KeyR') attemptReload(); if (e.code === 'KeyQ') switchWeapon(); if (e.code >= 'Digit1' && e.code <= 'Digit4') { player.weaponIndex = e.code.charCodeAt(0) - 'Digit1'.charCodeAt(0); cancelReload(); } });
+window.addEventListener('keydown', e => { keys[e.code] = true; if (e.code === 'KeyR') attemptReload(); if (e.code === 'KeyQ') switchWeapon(); if (e.code === 'Space') doJump(); if (e.code === 'ControlLeft' || e.code === 'KeyC') toggleCrouch(); if (e.code >= 'Digit1' && e.code <= 'Digit4') { player.weaponIndex = e.code.charCodeAt(0) - 'Digit1'.charCodeAt(0); cancelReload(); } });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 
 canvas.addEventListener('click', () => { if (gameState === 'playing' && !isTouchDevice()) canvas.requestPointerLock(); });
@@ -376,6 +383,27 @@ bindHold('btn-fire', () => { player.isShooting = true; }, () => { player.isShoot
 bindHold('btn-ads', () => { player.ads = true; }, () => { player.ads = false; });
 bindHold('btn-reload', () => attemptReload(), null);
 bindHold('btn-switch', () => switchWeapon(), null);
+
+// botões de toque único (não precisam ser segurados)
+function bindTap(id, onTap){
+  const el = document.getElementById(id);
+  const handler = e => { e.preventDefault(); SFX.init(); onTap(el); };
+  el.addEventListener('touchstart', handler, { passive: false });
+  el.addEventListener('mousedown', handler);
+}
+bindTap('btn-jump', () => doJump());
+bindTap('btn-crouch', (el) => { toggleCrouch(); el.classList.toggle('toggled', player.crouching); });
+
+function doJump(){
+  if (player.jumping || player.crouching) return;
+  player.jumping = true;
+  player.jumpT = 0;
+  SFX.click(200);
+}
+
+function toggleCrouch(){
+  player.crouching = !player.crouching;
+}
 
 function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
@@ -604,9 +632,15 @@ function updateParticles(dt){
    10. PROJEÇÃO — converte um ponto do mundo para coordenadas de tela
    (mesma transformação usada para os sprites dos inimigos)
    ========================================================================= */
+function getVerticalOffset(){
+  const jumpOffset = player.jumping ? -Math.sin(player.jumpT * Math.PI) * 26 : 0;
+  const crouchOffset = player.crouching ? 34 : 0;
+  return jumpOffset + crouchOffset;
+}
+
 function worldToScreen(wx, wy){
   const dirX = Math.cos(player.dir), dirY = Math.sin(player.dir);
-  const planeLen = Math.tan(player.fov / 2) * (1 - player.adsAmount * 0.55);
+  const planeLen = Math.tan(player.fov / 2) * (1 - player.adsAmount * WEAPONS[player.weaponIndex].adsZoom);
   const planeX = -dirY * planeLen, planeY = dirX * planeLen;
 
   const spriteX = wx - player.x, spriteY = wy - player.y;
@@ -615,7 +649,7 @@ function worldToScreen(wx, wy){
   const transformY = invDet * (-planeY * spriteX + planeX * spriteY);
 
   const screenX = (W / 2) * (1 + transformY / (transformX || 0.0001));
-  const screenY = H / 2 + player.pitch * RENDER_SCALE;
+  const screenY = H / 2 + player.pitch * RENDER_SCALE + getVerticalOffset();
   return { x: screenX / RENDER_SCALE, y: screenY / RENDER_SCALE, depth: transformX };
 }
 
@@ -633,7 +667,8 @@ function render(now){
   ctx.save();
   ctx.translate(shakeX, shakeY);
 
-  const horizon = H / 2 + player.pitch;
+  // deslocamento vertical: olhar (arraste) + pulo (arco) + agachar (câmera mais baixa)
+  const horizon = H / 2 + player.pitch + getVerticalOffset();
 
   // céu / chão
   const skyGrad = ctx.createLinearGradient(0, 0, 0, horizon);
@@ -645,7 +680,7 @@ function render(now){
 
   // paredes por raycasting
   const dirX = Math.cos(player.dir), dirY = Math.sin(player.dir);
-  const planeLen = Math.tan(player.fov / 2) * (1 - player.adsAmount * 0.55);
+  const planeLen = Math.tan(player.fov / 2) * (1 - player.adsAmount * WEAPONS[player.weaponIndex].adsZoom);
   const planeX = -dirY * planeLen, planeY = dirX * planeLen;
 
   const numRays = Math.ceil(W / RAY_STEP);
@@ -807,7 +842,12 @@ function updateHUD(now){
   document.getElementById('enemies-left').textContent = enemies.filter(e => e.alive).length;
 
   const crosshair = document.getElementById('crosshair');
+  const scopeOverlay = document.getElementById('scope-overlay');
+  const isScoped = player.ads && w.scope === 'scope';
   crosshair.classList.toggle('ads', player.ads);
+  crosshair.classList.toggle('reddot', player.ads && w.scope === 'reddot');
+  crosshair.classList.toggle('scoped', isScoped);
+  scopeOverlay.classList.toggle('show', isScoped);
 
   const flash = document.querySelector('.muzzle-flash');
   if (now < muzzleFlashUntil) ensureMuzzleFlashEl().classList.add('show');
@@ -847,6 +887,12 @@ function updatePlayer(dt, now){
   player.adsAmount += ((player.ads ? 1 : 0) - player.adsAmount) * clamp(dt * 8, 0, 1);
   player.viewKick *= Math.max(0, 1 - dt * 10);
 
+  // animação de pulo (efeito visual/sonoro — o mapa é plano, sem eixo vertical de física)
+  if (player.jumping) {
+    player.jumpT += dt / 0.5; // pulo dura ~0.5s
+    if (player.jumpT >= 1) { player.jumping = false; player.jumpT = 0; }
+  }
+
   // movimento: teclado (desktop) + joystick virtual (mobile)
   let moveF = 0, moveS = 0;
   if (keys['KeyW']) moveF += 1;
@@ -856,7 +902,8 @@ function updatePlayer(dt, now){
   moveF += -joyVec.y; moveS += joyVec.x;
   moveF = clamp(moveF, -1, 1); moveS = clamp(moveS, -1, 1);
 
-  const speed = player.speed * (player.ads ? 0.55 : 1);
+  let speed = player.speed * (player.ads ? 0.55 : 1);
+  if (player.crouching) speed *= 0.5;
   const dirX = Math.cos(player.dir), dirY = Math.sin(player.dir);
   const rightX = -dirY, rightY = dirX;
   const dx = (dirX * moveF + rightX * moveS) * speed * dt;
@@ -919,6 +966,8 @@ function resetGame(){
   player.x = 8.5; player.y = 8.5; player.dir = Math.PI; player.pitch = 0;
   player.health = 100; player.weaponIndex = 0; player.reloading = false;
   player.ads = false; player.adsAmount = 0; player.isShooting = false;
+  player.crouching = false; player.jumping = false; player.jumpT = 0;
+  document.getElementById('btn-crouch').classList.remove('toggled');
   player.ammo = WEAPONS.map(w => ({ mag: w.magSize, reserve: w.reserveMax }));
   player.alive = true;
 
