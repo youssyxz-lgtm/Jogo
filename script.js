@@ -59,6 +59,7 @@ const WEAPONS = [
     reloadTime: 2200, magSize: 30, reserveMax: 90,
     recoil: 0.05, kick: 10, soundFreq: 95, soundDur: 0.09,
     scope: 'reddot', adsZoom: 0.42,
+    vm: { barrelLen: 82, body: '#332b22', stock: '#6b4a2a', mag: '#4a3a20' },
   },
   {
     name: 'Kar98k', auto: false, damage: 96, headshotMult: 1.6,
@@ -66,6 +67,7 @@ const WEAPONS = [
     reloadTime: 3200, magSize: 5, reserveMax: 25,
     recoil: 0.09, kick: 22, soundFreq: 55, soundDur: 0.20,
     scope: 'scope', adsZoom: 0.80,
+    vm: { barrelLen: 122, body: '#241d15', stock: '#7a5530', mag: '#241d15' },
   },
   {
     name: 'Uzi', auto: true, damage: 17, headshotMult: 2.0,
@@ -73,6 +75,7 @@ const WEAPONS = [
     reloadTime: 1700, magSize: 32, reserveMax: 96,
     recoil: 0.032, kick: 7, soundFreq: 150, soundDur: 0.06,
     scope: 'reddot', adsZoom: 0.30,
+    vm: { barrelLen: 44, body: '#232326', stock: '#18181a', mag: '#1c1c1e' },
   },
   {
     name: 'P90', auto: true, damage: 21, headshotMult: 2.0,
@@ -80,6 +83,7 @@ const WEAPONS = [
     reloadTime: 2000, magSize: 50, reserveMax: 150,
     recoil: 0.026, kick: 6, soundFreq: 170, soundDur: 0.055,
     scope: 'reddot', adsZoom: 0.36,
+    vm: { barrelLen: 58, body: '#54585c', stock: '#3a3d40', mag: '#2c2e30' },
   },
 ];
 
@@ -736,6 +740,9 @@ function render(now){
   }
   ctx.globalAlpha = 1;
 
+  // arma + mãos em primeira pessoa (desenhadas por cima de tudo, direto no canvas)
+  drawWeaponViewmodel(now);
+
   ctx.restore();
   renderMinimap();
 }
@@ -743,6 +750,90 @@ function render(now){
 function shadeColor(hex, factor){
   const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
   return `rgb(${(r * factor) | 0},${(g * factor) | 0},${(b * factor) | 0})`;
+}
+
+/* ---- Arma + mãos desenhadas direto no canvas (estilo "hud gun" de FPS mobile) ---- */
+function drawWeaponViewmodel(now){
+  const w = WEAPONS[player.weaponIndex];
+  const vm = w.vm;
+  const u = Math.min(W, H) / 380; // unidade de escala relativa à resolução da tela
+
+  const moving = Math.hypot(joyVec.x, joyVec.y) > 0.15 ||
+    keys['KeyW'] || keys['KeyA'] || keys['KeyS'] || keys['KeyD'];
+  const t = now * 0.0062;
+  const bobX = (moving ? Math.sin(t) * 9 : Math.sin(t * 0.3) * 2) * u;
+  const bobY = (moving ? Math.abs(Math.sin(t * 2)) * 7 : Math.sin(t * 0.3) * 1.5) * u;
+
+  let reloadDrop = 0, reloadTilt = 0;
+  if (player.reloading) {
+    const rt = clamp((now - player.reloadStart) / w.reloadTime, 0, 1);
+    const dip = rt < 0.5 ? rt / 0.5 : (1 - rt) / 0.5;
+    reloadDrop = dip * 95 * u;
+    reloadTilt = dip * 0.32;
+  }
+
+  const recoilKick = (player.viewKick || 0) * 1.8 * u;
+  const adsSlide = player.adsAmount * 58 * u;
+  const adsRise = player.adsAmount * 34 * u;
+
+  const anchorX = W / 2 + 78 * u - adsSlide + bobX;
+  const anchorY = H - 6 * u + bobY + reloadDrop - adsRise - recoilKick;
+
+  ctx.save();
+  ctx.translate(anchorX, anchorY);
+  ctx.rotate(reloadTilt - recoilKick * 0.006);
+  ctx.scale(u, u);
+
+  // manga do braço da frente (sob o cano)
+  ctx.fillStyle = shadeColor('#3d4a32', 0.9);
+  ctx.fillRect(-52, -vm.barrelLen + 14, 30, 38);
+  // mão da frente
+  ctx.fillStyle = '#c99a70';
+  ctx.beginPath(); ctx.arc(-34, -vm.barrelLen + 26, 14, 0, Math.PI * 2); ctx.fill();
+
+  // cano
+  ctx.fillStyle = shadeColor('#0d0d0c', 1);
+  ctx.fillRect(-11, -vm.barrelLen, 16, vm.barrelLen - 10);
+  // ponta de mira
+  ctx.fillStyle = '#050504';
+  ctx.fillRect(-6, -vm.barrelLen - 6, 8, 8);
+
+  // corpo/receiver
+  ctx.fillStyle = vm.body;
+  ctx.fillRect(-42, -18, 84, 32);
+  ctx.fillStyle = shadeColor(vm.body, 1.25);
+  ctx.fillRect(-42, -18, 84, 5); // reflexo superior sutil
+
+  // carregador
+  ctx.fillStyle = vm.mag;
+  ctx.beginPath();
+  ctx.moveTo(-6, 14); ctx.lineTo(9, 14); ctx.lineTo(4, 60); ctx.lineTo(-11, 60);
+  ctx.closePath(); ctx.fill();
+
+  // coronha / parte traseira
+  ctx.fillStyle = vm.stock;
+  ctx.fillRect(30, -6, 48, 20);
+
+  // manga do braço de trás
+  ctx.fillStyle = shadeColor('#3d4a32', 0.9);
+  ctx.fillRect(58, -6, 44, 26);
+  // mão de trás (no gatilho)
+  ctx.fillStyle = '#c99a70';
+  ctx.beginPath(); ctx.arc(52, 8, 15, 0, Math.PI * 2); ctx.fill();
+
+  ctx.restore();
+
+  // flash do disparo, na ponta do cano
+  if (now < muzzleFlashUntil) {
+    const fx = anchorX + Math.sin(reloadTilt) * 0 - 4 * u; // aproximação da ponta do cano
+    const fy = anchorY - vm.barrelLen * u - 4 * u;
+    const grad = ctx.createRadialGradient(fx, fy, 0, fx, fy, 34 * u);
+    grad.addColorStop(0, 'rgba(255,235,170,0.95)');
+    grad.addColorStop(0.45, 'rgba(255,176,32,0.55)');
+    grad.addColorStop(1, 'rgba(255,176,32,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(fx, fy, 34 * u, 0, Math.PI * 2); ctx.fill();
+  }
 }
 
 function drawEnemySprite(en, sp, now){
@@ -849,10 +940,6 @@ function updateHUD(now){
   crosshair.classList.toggle('scoped', isScoped);
   scopeOverlay.classList.toggle('show', isScoped);
 
-  const flash = document.querySelector('.muzzle-flash');
-  if (now < muzzleFlashUntil) ensureMuzzleFlashEl().classList.add('show');
-  else { const el = document.querySelector('.muzzle-flash'); if (el) el.classList.remove('show'); }
-
   const hm = document.getElementById('hitmarker');
   hm.classList.toggle('show', now < hitmarkerUntil);
 
@@ -865,16 +952,6 @@ function updateHUD(now){
   } else {
     arrow.classList.remove('show');
   }
-}
-
-function ensureMuzzleFlashEl(){
-  let el = document.querySelector('.muzzle-flash');
-  if (!el) {
-    el = document.createElement('div');
-    el.className = 'muzzle-flash';
-    document.getElementById('viewmodel').appendChild(el);
-  }
-  return el;
 }
 
 /* =========================================================================
