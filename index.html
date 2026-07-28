@@ -47,6 +47,13 @@
     <div id="hitmarker">✕</div>
     <div id="hit-indicator"><div class="hit-arrow"></div></div>
 
+    <!-- mira telescópica (Kar98k) -->
+    <div id="scope-overlay">
+      <div class="scope-crosshair-v"></div>
+      <div class="scope-crosshair-h"></div>
+      <div class="scope-dot"></div>
+    </div>
+
     <!-- minimapa -->
     <canvas id="minimap" width="120" height="120"></canvas>
 
@@ -84,7 +91,7 @@
       </div>
     </div>
 
-    <!-- ===================== CONTROLES MOBILE ===================== -->
+    <!-- ===================== CONTROLES MOBILE (pensado p/ 4 dedos) ===================== -->
     <div id="joystick-zone" class="touch-zone">
       <div id="joystick-base">
         <div id="joystick-nub"></div>
@@ -93,12 +100,23 @@
 
     <div id="look-zone" class="touch-zone"></div>
 
-    <div id="action-buttons">
-      <button id="btn-reload" class="ctrl-btn ctrl-btn-hex" title="Recarregar">
-        <span>RECAR.</span>
+    <!-- botões pequenos no canto superior direito: alcançáveis pelos dedos "de trás" -->
+    <div id="top-buttons">
+      <button id="btn-jump" class="ctrl-btn ctrl-btn-hex" title="Pular">
+        <span>PULAR</span>
       </button>
+      <button id="btn-crouch" class="ctrl-btn ctrl-btn-hex" title="Agachar">
+        <span>AGACH.</span>
+      </button>
+    </div>
+
+    <!-- botões principais no canto inferior direito: polegar direito -->
+    <div id="action-buttons">
       <button id="btn-switch" class="ctrl-btn ctrl-btn-hex" title="Trocar arma">
         <span>TROCAR</span>
+      </button>
+      <button id="btn-reload" class="ctrl-btn ctrl-btn-hex" title="Recarregar">
+        <span>RECAR.</span>
       </button>
       <button id="btn-ads" class="ctrl-btn ctrl-btn-circle" title="Mirar">
         <span>MIRA</span>
